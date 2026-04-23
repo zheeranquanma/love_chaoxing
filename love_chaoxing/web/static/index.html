@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>学习通签到助手 Pro</title>
+    <!-- 引入地图 -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=93afda4808d5282a27c19c1e25220968"></script>
+    <!-- 引入扫码库 -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        :root {
+            --primary: #07c160;
+            --primary-dark: #06ad56;
+            --bg: #f5f6fa;
+            --card: #fff;
+            --text: #333;
+            --text-secondary: #666;
+            --border: #e8e8e8;
+            --danger: #fa5151;
+            --warning: #ffc300;
+            --info: #1989fa;
+        }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+        
+        /* ========== 顶部固定免责声明条（醒目） ========== */
+        .top-disclaimer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(90deg, #ff6b6b, #ff9f43);
+            color: #fff;
+            font-size: 12px;
+            text-align: center;
+            padding: 6px 10px;
+            z-index: 9999;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding-bottom: 70px;
+            padding-top: 38px; /* 适配顶部免责条 */
+            line-height: 1.6;
+        }
+        
+        .page { display: none; padding: 16px; min-height: calc(100vh - 108px); }
+        .page.active { display: block; animation: fadeIn 0.3s; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* ========== 签到页超大免责声明卡片 ========== */
+        .disclaimer-card {
+            background: linear-gradient(135deg, #fff5e6 0%, #fff9e6 100%);
+            border: 2px solid #ff9f43;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 16px;
+            text-align: left;
+            position: relative;
+        }
+        .disclaimer-card h4 {
+            color: #e64343;
+            font-size: 16px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .disclaimer-card p {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.6;
+            margin-bottom: 6px;
+        }
+        .disclaimer-card strong {
+            color: #e64343;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            margin-bottom: 12px;
+            -webkit-appearance: none;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        button {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button:active { transform: scale(0.98); opacity: 0.9; }
+        button:disabled { background: #ccc; }
+        button.secondary { background: #f2f2f2; color: var(--text); margin-top: 10px; }
+        button.info { background: var(--info); }
+        button.danger { background: var(--danger); }
+        button.warning { background: var(--warning); color: #333; }
+        button.small { padding: 8px 16px; font-size: 14px; width: auto; display: inline-block; margin: 4px; }
+        
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .btn-group button { flex: 1; min-width: 120px; }
+        
+        .list-item {
+            background: var(--card);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        
+        .list-item .content { flex: 1; min-width: 0; }
+        .list-item .title { font-weight: 600; font-size: 16px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .list-item .subtitle { font-size: 13px; color: var(--text-secondary); }
+        .list-item .badge { font-size: 12px; padding: 4px 10px; border-radius: 12px; background: #e6f7ed; color: var(--primary); white-space: nowrap; }
+        .list-item .badge.expired { background: #fee; color: var(--danger); }
+        .list-item .badge.teacher { background: #e6f4ff; color: var(--info); }
+        
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: #fff;
+            border-top: 1px solid var(--border);
+            display: flex;
+            z-index: 100;
+        }
+        
+        .tab-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #999;
+            cursor: pointer;
+        }
+        
+        .tab-item.active { color: var(--primary); }
+        .tab-item .icon { font-size: 22px; }
+        
+        .type-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+        
+        .type-tab {
+            padding: 8px 14px;
+            background: #f0f0f0;
+            border-radius: 20px;
+            font-size: 13px;
+            white-space: nowrap;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        
+        .type-tab.active {
+            background: #e6f7ed;
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .info-box {
+            background: #e6f4ff;
+            border-left: 4px solid var(--info);
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #0050b3;
+        }
+        
+        .warning-box {
+            background: #fffbe6;
+            border-left: 4px solid var(--warning);
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #ad6800;
+        }
+        
+        .result-box {
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            text-align: center;
+            font-weight: 600;
+            color: #52c41a;
+            display: none;
+        }
+        .result-box.error { background: #fff1f0; border-color: #ffa39e; color: #cf1322; }
+        
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .loading { text-align: center; padding: 40px; color: #999; }
+        
+        /* 地图容器 */
+        #map-container {
+            width: 100%;
+            height: 300px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            display: none;
+        }
+        
+        /* 快捷操作按钮 */
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .quick-actions button { flex: 1; min-width: 100px; }
+        
+        /* 账号列表 */
+        .account-list {
+            margin-top: 12px;
+        }
+        .account-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .account-item:hover { background: #e9ecef; }
+        .account-item .acc-name { flex: 1; font-weight: 500; }
+        .account-item .acc-info { font-size: 12px; color: var(--text-secondary); }
+        
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        /* ===== 新增：扫码相关样式 ===== */
+        #scan-box {
+            display: none;
+            max-width: 320px;
+            margin: 0 auto 10px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+        }
+        .scan-overlay {
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0,0,0,0.85); z-index: 300;
+          display: none; flex-direction: column;
+          align-items: center; justify-content: center; padding: 20px;
+}
+        .scan-overlay.active { display: flex; }
+#reader-full {
+  width: 100%; max-width: 320px; border-radius: 12px;
+  overflow: hidden; background: #000; margin: 20px 0;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.scan-msg { color: #8b949e; font-size: 14px; margin-top: 10px; text-align: center; }
+/* 强制视频层铺满且保持比例，避免拉伸导致失焦 */
+#reader-full video {
+  width: 100% !important; height: auto !important; object-fit: cover;
+}
+
+        .scan-overlay .scan-res {
+            padding: 15px;
+            background: #161b22;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 300px;
+            text-align: center;
+            font-size: 15px;
+            display: none;
+        }
+        .scan-overlay .scan-res.ok { color: #3fb950; border: 1px solid #238636; }
+        .scan-overlay .scan-res.err { color: #f85149; border: 1px solid #da3633; }
+        /* ============================== */
+    </style>
+</head>
+<body>
+
+<!-- ========== 顶部固定醒目免责声明 ========== -->
+<div class="top-disclaimer">
+    ⚠️ 本工具仅限青岛理工大学内部测试 | 完全开源免费 | 无任何收费/广告 | 谨防诈骗
+</div>
+
+<!-- 登录页 -->
+<div id="page-login" class="page active">
+    <div class="card">
+        <div class="card-title">🔐 账号登录</div>
+        
+        <div id="login-form-section">
+            <input type="text" id="username" placeholder="学习通账号/手机号">
+            <input type="password" id="password" placeholder="密码">
+            <button onclick="doLogin()">登录</button>
+            <button class="secondary" onclick="toggleInject()">使用Cookie登录</button>
+        </div>
+        
+        <div id="inject-form-section" style="display:none;">
+            <div class="info-box">在浏览器登录学习通后，按F12输入 document.cookie 复制完整内容粘贴到下方</div>
+            <textarea id="cookie-input" rows="4" placeholder="UID=xxx; _uid=xxx; ..."></textarea>
+            <button onclick="doInject()">注入Cookie并登录</button>
+            <button class="secondary" onclick="toggleInject()">返回账号登录</button>
+        </div>
+    </div>
+    
+    <!-- 保存的账号列表 -->
+    <div class="card" id="saved-accounts-card" style="display:none;">
+        <div class="card-title">📚 历史账号 <span style="font-size:14px;color:#999;font-weight:normal;">(点击快速登录)</span></div>
+        <div class="account-list" id="saved-accounts-list"></div>
+    </div>
+    
+    <div class="card" id="user-card" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:50px;height:50px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;" id="user-avatar">?</div>
+            <div>
+                <div style="font-size:16px;font-weight:600;" id="user-name">未登录</div>
+                <div style="font-size:13px;color:var(--text-secondary);" id="user-meta">请点击上方登录</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 课程页 -->
+<div id="page-courses" class="page">
+    <div class="card">
+        <div class="card-title">📚 我的课程</div>
+        <div id="courses-list" class="loading">加载中...</div>
+    </div>
+</div>
+
+<!-- 活动页 -->
+<div id="page-activities" class="page">
+    <div class="card">
+        <div class="card-title">📋 签到任务</div>
+        <div id="activities-list" class="loading">请先选择课程</div>
+    </div>
+</div>
+
+<!-- 签到页 -->
+<div id="page-signin" class="page">
+    <div class="card">
+        <!-- ========== 签到页超大免责声明（核心） ========== -->
+        <div class="disclaimer-card">
+            <h4>⚠️ 重要免责声明</h4>
+            <p>1. <strong>本工具仅限青岛理工大学内部测试使用</strong>，完全开源免费，<strong>无任何收费、无广告、无倒卖</strong>，切勿相信任何收费代签服务！</p>
+            <p>2. 青理老师布置签到任务是<strong>尽职尽责、认真教学</strong>的表现，我们应当尊重老师的教学安排，自觉完成课堂签到。</p>
+            <p>3. 本工具<strong>仅用于紧急时刻应急使用</strong>，严禁用于逃课、代签等违规行为，由此产生的一切后果由使用者自行承担。</p>
+            <p>4. 请勿滥用工具，遵守学校规章制度与课堂纪律，做诚信自律的青理学子！</p>
+        </div>
+
+        <div class="card-title">✅ 执行签到</div>
+        
+        <!-- 快捷操作区 -->
+        <div class="quick-actions" id="quick-actions">
+            <!-- 动态生成 -->
+        </div>
+        
+        <div class="type-tabs">
+            <div class="type-tab active" data-type="1" onclick="selectType(1)">普通</div>
+            <div class="type-tab" data-type="0" onclick="selectType(0)">拍照</div>
+            <div class="type-tab" data-type="4" onclick="selectType(4)">位置</div>
+            <div class="type-tab" data-type="3" onclick="selectType(3)">手势</div>
+            <div class="type-tab" data-type="5" onclick="selectType(5)">签到码</div>
+            <div class="type-tab" data-type="2" onclick="selectType(2)">二维码</div>
+        </div>
+        
+        <input type="hidden" id="active-id">
+        <input type="hidden" id="course-id">
+        <input type="hidden" id="class-id">
+        
+        <!-- 拍照签到 -->
+        <div id="form-photo" style="display:none;">
+            <div class="info-box">📷 拍照签到 - 可借用同学照片或上传自己的</div>
+            <input type="text" id="object-id" placeholder="objectId (留空自动获取同学照片)">
+            <div class="btn-group">
+                <button class="info small" onclick="getClassPhoto()">🖼️ 一键借用同学照片</button>
+                <button class="warning small" onclick="document.getElementById('object-id').value=''">🗑️ 清空</button>
+            </div>
+        </div>
+        
+        <!-- 位置签到 -->
+        <div id="form-location">
+            <div class="info-box">📍 位置签到 - 可在地图自选或获取老师位置</div>
+            <div id="map-container"></div>
+            <input type="number" id="longitude" placeholder="经度 (如: 116.4074)" step="0.000001">
+            <input type="number" id="latitude" placeholder="纬度 (如: 39.9042)" step="0.000001">
+            <input type="text" id="address" placeholder="地址名称">
+            <div class="btn-group">
+                <button class="info small" onclick="getBrowserLocation()">📡 浏览器定位</button>
+                <button class="info small" onclick="showMapPicker()">🗺️ 地图选点</button>
+                <button class="warning small" onclick="getTeacherLocation()">👨‍🏫 获取老师位置</button>
+            </div>
+        </div>
+        
+        <!-- 手势/签到码 -->
+        <div id="form-code" style="display:none;">
+            <div class="info-box" id="code-info">🔑 输入手势密码或签到码</div>
+            <input type="text" id="sign-code" placeholder="手势密码 / 签到码">
+            <div class="btn-group">
+                <button class="info small" onclick="bruteForceCode()">🔓 一键破解</button>
+                <button class="warning small" onclick="getSignCode()">👁️ 查看签到码</button>
+            </div>
+        </div>
+        
+        <!-- 二维码 -->
+        <div id="form-qr" style="display:none;">
+            <div class="info-box">@二维码签到-可代签多人</div>
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+                <input type="text" id="qr-enc" placeholder="enc参数或完整URL">
+                <!-- 修改：生成手机扫码链接按钮 -->
+                <button class="info small" onclick="generateMobileLink()" style="margin-left:6px;">📱 发给手机扫码</button>
+            </div>
+            <!-- 新增：扫码区域 -->
+            <div id="scan-box"></div>
+            <div class="btn-group">
+                <button class="info small" onclick="generateQRSignUrl()">🔗生成代签链接</button>
+                <button class="warning small" onclick="showMultiSign()">👥多人代签</button>
+            </div>
+        </div>
+        
+        <!-- 修改：二维码签到时显示扫码按钮，其他类型显示立即签到 -->
+        <button onclick="doSign()" id="btn-sign">立即签到</button>
+        <button onclick="startScanSign()" id="btn-scan-sign" style="display:none;background:var(--info);">📷 扫码签到</button>
+        
+        <button class="secondary" onclick="navTo('activities')">返回</button>
+        
+        <div id="result-box" class="result-box"></div>
+    </div>
+</div>
+
+<!-- 底部导航 -->
+<div class="tab-bar">
+    <div class="tab-item active" data-page="login" onclick="navTo('login')"><div class="icon">🔐</div><div>登录</div></div>
+    <div class="tab-item" data-page="courses" onclick="navTo('courses')"><div class="icon">📚</div><div>课程</div></div>
+    <div class="tab-item" data-page="activities" onclick="navTo('activities')"><div class="icon">📋</div><div>任务</div></div>
+    <div class="tab-item" data-page="signin" onclick="navTo('signin')"><div class="icon">✅</div><div>签到</div></div>
+</div>
+
+<!-- 地图选点模态框 -->
+<div class="modal" id="map-modal">
+    <div class="modal-content" style="max-width:90%;height:80vh;">
+        <div class="modal-title">🗺️ 地图选点 <button class="small danger" onclick="closeMap()" style="float:right;width:auto;">关闭</button></div>
+        <div id="map-picker" style="width:100%;height:calc(100% - 60px);border-radius:8px;"></div>
+        <button onclick="confirmMapLocation()" style="margin-top:10px;">确认选择</button>
+    </div>
+</div>
+
+<!-- 多人签到模态框 -->
+<div class="modal" id="multi-sign-modal">
+    <div class="modal-content">
+        <div class="modal-title">👥 多人代签 <button class="small danger" onclick="closeMultiSign()" style="float:right;width:auto;">关闭</button></div>
+        <div class="info-box">输入多个账号，每行一个，格式：账号,密码</div>
+        <textarea id="multi-users" rows="6" placeholder="13800138000,password1&#10;13900139000,password2"></textarea>
+        <button onclick="doMultiSign()">开始批量签到</button>
+        <div id="multi-result" style="margin-top:12px;font-size:13px;"></div>
+    </div>
+</div>
+
+<!-- 新增：全屏扫码模态框 -->
+<div class="scan-overlay" id="scan-overlay">
+    <div class="scan-msg" id="scan-msg">📷 正在启动相机，请允许权限...</div>
+    <div id="reader-full"></div>
+    <div id="scan-res" class="scan-res"></div>
+    <button class="danger" onclick="stopScanSign()" style="margin-top:15px;width:auto;padding:10px 30px;">取消扫码</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+// ==================== 全局状态 ====================
+let currentCourse = null, currentActivity = null, currentType = 1;
+const typeNames = ['拍照签到', '普通签到', '二维码签到', '手势签到', '位置签到', '签到码签到'];
+let mapPicker = null, mapMarker = null;
+let selectedMapLocation = null;
+
+// ==================== 新增：URL参数恢复状态 ====================
+(function restoreFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    if (mode !== 'mobile') return; // 不是手机模式则跳过
+    
+    // 恢复账号密码
+    const u = params.get('u');
+    const p = params.get('p');
+    if (u) document.getElementById('username').value = u;
+    if (p) document.getElementById('password').value = p;
+    
+    // 恢复任务信息
+    const aid = params.get('activeId');
+    const cid = params.get('courseId');
+    const clid = params.get('classId');
+    const tp = params.get('type');
+    
+    if (aid) {
+        document.getElementById('active-id').value = aid;
+        document.getElementById('course-id').value = cid || '';
+        document.getElementById('class-id').value = clid || '';
+        if (tp) {
+            currentType = parseInt(tp);
+            selectType(currentType);
+        }
+        // 如果是二维码类型，直接显示扫码按钮
+        if (currentType === 2) {
+            document.getElementById('btn-sign').style.display = 'none';
+            document.getElementById('btn-scan-sign').style.display = 'block';
+        }
+        // 自动导航到签到页
+        setTimeout(() => {
+            switchTab('signin');
+            showToast('📱 手机扫码模式：请直接扫码签到');
+        }, 500);
+    }
+})();
+
+// ==================== 页面导航 ====================
+function navTo(tab) {
+    if (tab === 'courses') {
+        checkAuth().then(ok => { if (!ok) { showToast('请先登录'); return; } switchTab(tab); });
+        return;
+    }
+    if (tab === 'activities' && !currentCourse) { showToast('请先选择课程'); return; }
+    if (tab === 'signin' && !currentActivity) { showToast('请先选择签到任务'); return; }
+    switchTab(tab);
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    document.getElementById(`page-${tab}`).classList.add('active');
+    document.querySelector(`.tab-item[data-page="${tab}"]`).classList.add('active');
+    if (tab === 'courses') loadCourses();
+    if (tab === 'activities' && currentCourse) loadActivities(currentCourse);
+}
+
+async function checkAuth() {
+    try { const res = await fetch('/api/userinfo'); const data = await res.json(); return data.success && data.data.uid; } catch (e) { return false; }
+}
+
+// ==================== 登录相关 ====================
+function toggleInject() {
+    const loginForm = document.getElementById('login-form-section');
+    const injectForm = document.getElementById('inject-form-section');
+    loginForm.style.display = loginForm.style.display === 'none' ? 'block' : 'none';
+    injectForm.style.display = injectForm.style.display === 'none' ? 'block' : 'none';
+}
+
+async function doLogin() {
+    const btn = event.target;
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+    if (!username || !password) { showToast('请输入账号和密码'); return; }
+    
+    btn.disabled = true; btn.textContent = '登录中...';
+    try {
+        const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username, password}) });
+        const data = await res.json();
+        if (data.success) {
+            showToast('登录成功');
+            saveAccount(username, password, data.userinfo.name);
+            updateUserInfo(data.userinfo);
+            setTimeout(() => navTo('courses'), 500);
+        } else {
+            showToast(data.msg || '登录失败');
+        }
+    } catch (e) { showToast('网络错误'); }
+    finally { btn.disabled = false; btn.textContent = '登录'; }
+}
+
+async function doInject() {
+    const btn = event.target, cookies = document.getElementById('cookie-input').value.trim();
+    if (!cookies) { showToast('请输入Cookie'); return; }
+    btn.disabled = true; btn.textContent = '注入中...';
+    try {
+        const res = await fetch('/api/inject', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({cookies}) });
+        const data = await res.json();
+        showToast(data.msg);
+        if (data.success) {
+            const userRes = await fetch('/api/userinfo');
+            const userData = await userRes.json();
+            if (userData.success) { updateUserInfo(userData.data); setTimeout(() => navTo('courses'), 500); }
+        }
+    } catch (e) { showToast('注入失败'); }
+    finally { btn.disabled = false; btn.textContent = '注入Cookie并登录'; }
+}
+
+function updateUserInfo(info) {
+    document.getElementById('user-card').style.display = 'block';
+    document.getElementById('user-avatar').textContent = info.name ? info.name[0] : '?';
+    document.getElementById('user-name').textContent = info.name || '未知用户';
+    document.getElementById('user-meta').innerHTML = `${info.school || ''} ${info.dept || ''}<br><small>UID: ${info.uid}</small>`;
+}
+
+// ==================== 历史账号管理 ====================
+function saveAccount(username, password, name) {
+    let accounts = JSON.parse(localStorage.getItem('cx_accounts') || '[]');
+    accounts = accounts.filter(a => a.username !== username);
+    accounts.unshift({ username, password, name, time: Date.now() });
+    accounts = accounts.slice(0, 10);
+    localStorage.setItem('cx_accounts', JSON.stringify(accounts));
+    renderSavedAccounts();
+}
+
+function renderSavedAccounts() {
+    const accounts = JSON.parse(localStorage.getItem('cx_accounts') || '[]');
+    const container = document.getElementById('saved-accounts-list');
+    const card = document.getElementById('saved-accounts-card');
+    
+    if (accounts.length === 0) {
+        card.style.display = 'none';
+        return;
+    }
+    
+    card.style.display = 'block';
+    container.innerHTML = '';
+    accounts.forEach(acc => {
+        const div = document.createElement('div');
+        div.className = 'account-item';
+        div.innerHTML = `
+            <div class="acc-name">${acc.name || acc.username}</div>
+            <div class="acc-info">${acc.username}</div>
+        `;
+        div.onclick = () => {
+            document.getElementById('username').value = acc.username;
+            document.getElementById('password').value = acc.password;
+            showToast('已填入账号密码，点击登录即可');
+        };
+        container.appendChild(div);
+    });
+}
+
+renderSavedAccounts();
+
+// ==================== 课程列表 ====================
+async function loadCourses() {
+    const container = document.getElementById('courses-list');
+    container.innerHTML = '<div class="loading">加载中...</div>';
+    try {
+        const res = await fetch('/api/courses');
+        const data = await res.json();
+        if (!data.success || !data.data.length) { container.innerHTML = '<div class="empty-state">暂无课程或登录已过期</div>'; return; }
+        container.innerHTML = '';
+        data.data.forEach(course => {
+            const div = document.createElement('div'); div.className = 'list-item';
+            div.innerHTML = `<div class="content"><div class="title">${course.courseName}</div><div class="subtitle">${course.className || '默认班级'} · ${course.teacherName || '未知教师'}</div></div><div class="badge ${course.isTeach ? 'teacher' : ''}">${course.isTeach ? '教师' : '学生'}</div>`;
+            div.onclick = () => { currentCourse = course; navTo('activities'); };
+            container.appendChild(div);
+        });
+    } catch (e) { container.innerHTML = '<div class="empty-state" style="color:red;">加载失败</div>'; }
+}
+
+// ==================== 活动列表 ====================
+async function loadActivities(course) {
+    const container = document.getElementById('activities-list');
+    container.innerHTML = '<div class="loading">加载中...</div>';
+    try {
+        const res = await fetch(`/api/activities?courseId=${course.courseId}&classId=${course.classId}`);
+        const data = await res.json();
+        if (!data.success || !data.data.length) { container.innerHTML = '<div class="empty-state">暂无进行中的签到</div>'; return; }
+        container.innerHTML = '';
+        data.data.forEach(act => {
+            const div = document.createElement('div'); div.className = 'list-item'; div.style.opacity = act.isExpire ? '0.6' : '1';
+            div.innerHTML = `<div class="content" style="flex:1;"><div class="title">${act.nameOne}</div><div class="subtitle">${typeNames[act.type]} · ${act.isExpire ? '已结束' : '进行中'}</div></div><div class="badge ${act.isExpire ? 'expired' : ''}">${act.isExpire ? '已过期' : '去签到'}</div>`;
+            if (!act.isExpire) {
+                div.onclick = () => {
+                    currentActivity = act;
+                    document.getElementById('active-id').value = act.activeId;
+                    document.getElementById('course-id').value = act.courseId;
+                    document.getElementById('class-id').value = act.classId;
+                    selectType(act.type);
+                    navTo('signin');
+                };
+            }
+            container.appendChild(div);
+        });
+    } catch (e) { container.innerHTML = '<div class="empty-state" style="color:red;">加载失败</div>'; }
+}
+
+// ==================== 签到页面 ====================
+function selectType(type) {
+    currentType = type;
+    document.querySelectorAll('.type-tab').forEach(t => t.classList.toggle('active', parseInt(t.dataset.type) === type));
+    document.getElementById('form-photo').style.display = type === 0 ? 'block' : 'none';
+    document.getElementById('form-location').style.display = type === 4 ? 'block' : 'none';
+    document.getElementById('form-code').style.display = (type === 3 || type === 5) ? 'block' : 'none';
+    document.getElementById('form-qr').style.display = type === 2 ? 'block' : 'none';
+    
+
+    const btnSign = document.getElementById('btn-sign');
+    const btnScan = document.getElementById('btn-scan-sign');
+    if (type === 2) {
+        btnSign.style.display = 'none';
+        btnScan.style.display = 'block';
+    } else {
+        btnSign.style.display = 'block';
+        btnScan.style.display = 'none';
+    }
+    
+    updateQuickActions(type);
+}
+
+function updateQuickActions(type) {
+    const container = document.getElementById('quick-actions');
+    const actions = {
+        0: '<button class="info small" onclick="getClassPhoto()">🖼️ 借照片</button>',
+        3: '<button class="info small" onclick="bruteForceCode()">🔓 破解手势</button><button class="warning small" onclick="getSignCode()">👁️ 查看手势</button>',
+        4: '<button class="info small" onclick="getTeacherLocation()">👨‍🏫 老师位置</button><button class="warning small" onclick="showMapPicker()">🗺️ 地图选点</button>',
+        5: '<button class="info small" onclick="bruteForceCode()">🔓 免码直签</button><button class="warning small" onclick="getSignCode()">👁️ 查看码</button>',
+        2: '<button class="info small" onclick="generateQRSignUrl()">🔗 代签链接</button><button class="warning small" onclick="showMultiSign()">👥 多人签</button>'
+    };
+    container.innerHTML = actions[type] || '';
+}
+
+// ==================== 位置签到高级功能 ====================
+function getBrowserLocation() {
+    if (!navigator.geolocation) { showToast('浏览器不支持定位'); return; }
+    showToast('正在获取位置...');
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            document.getElementById('longitude').value = pos.coords.longitude.toFixed(6);
+            document.getElementById('latitude').value = pos.coords.latitude.toFixed(6);
+            showToast('定位成功');
+        },
+        err => { showToast('定位失败: ' + err.message); }
+    );
+}
+
+function showMapPicker() {
+    securityJsCode: "dec4c21240463e74e77555ff516e7caf"
+    document.getElementById('map-modal').classList.add('active');
+    setTimeout(() => {
+        if (!mapPicker) {
+            mapPicker = new AMap.Map('map-picker', {
+                zoom: 15,
+                center: [116.4074, 39.9042]
+            });
+            mapPicker.on('click', function(e) {
+                if (mapMarker) mapMarker.setMap(null);
+                mapMarker = new AMap.Marker({ position: e.lnglat });
+                mapPicker.add(mapMarker);
+                selectedMapLocation = { lng: e.lnglat.lng, lat: e.lnglat.lat };
+            });
+        }
+    }, 100);
+}
+
+function closeMap() {
+    document.getElementById('map-modal').classList.remove('active');
+}
+
+function confirmMapLocation() {
+    if (!selectedMapLocation) { showToast('请先点击地图选择位置'); return; }
+    document.getElementById('longitude').value = selectedMapLocation.lng.toFixed(6);
+    document.getElementById('latitude').value = selectedMapLocation.lat.toFixed(6);
+    closeMap();
+    showToast('位置已选择');
+}
+
+async function getTeacherLocation() {
+    const activeId = document.getElementById('active-id').value;
+    if (!activeId) { showToast('请先选择签到任务'); return; }
+    
+    showToast('正在获取老师位置...');
+    try {
+        const res = await fetch(`/api/teacher-location?activeId=${activeId}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+            document.getElementById('longitude').value = data.data.longitude;
+            document.getElementById('latitude').value = data.data.latitude;
+            document.getElementById('address').value = data.data.address || '老师设置的位置';
+            showToast('已获取老师位置');
+        } else {
+            showToast(data.msg || '未获取到老师位置');
+        }
+    } catch (e) { showToast('获取失败'); }
+}
+
+// ==================== 拍照签到高级功能 ====================
+async function getClassPhoto() {
+    const activeId = document.getElementById('active-id').value;
+    if (!activeId) { showToast('请先选择签到任务'); return; }
+    
+    showToast('正在获取同学照片...');
+    try {
+        const res = await fetch(`/api/class-photos?activeId=${activeId}`);
+        const data = await res.json();
+        if (data.success && data.data.length > 0) {
+            document.getElementById('object-id').value = data.data[0];
+            showToast(`已借用同学照片: ${data.data[0].substring(0, 8)}...`);
+        } else {
+            showToast('未找到同学照片');
+        }
+    } catch (e) { showToast('获取失败'); }
+}
+
+// ==================== 手势/签到码高级功能 ====================
+async function bruteForceCode() {
+    const activeId = document.getElementById('active-id').value;
+    if (!activeId) { showToast('请先选择签到任务'); return; }
+    
+    if (!confirm('⚠️ 暴力破解可能需要较长时间，确定继续？')) return;
+    
+    showToast('正在破解中，请稍候...');
+    try {
+        const res = await fetch(`/api/brute-force-code?activeId=${activeId}`);
+        const data = await res.json();
+        if (data.success && data.data.found) {
+            document.getElementById('sign-code').value = data.data.code;
+            showToast(`破解成功: ${data.data.code}`);
+            if (confirm('是否立即使用破解的码签到？')) doSign();
+        } else {
+            showToast('破解失败，未找到正确码');
+        }
+    } catch (e) { showToast('破解失败'); }
+}
+
+async function getSignCode() {
+    const activeId = document.getElementById('active-id').value;
+    if (!activeId) { showToast('请先选择签到任务'); return; }
+    
+    showToast('正在获取签到码...');
+    try {
+        const res = await fetch(`/api/activity-info?activeId=${activeId}`);
+        const data = await res.json();
+        const code = data.data?.data?.signCode || data.data?.data?.code;
+        if (code) {
+            document.getElementById('sign-code').value = code;
+            showToast(`签到码: ${code}`);
+        } else {
+            showToast('未获取到签到码，尝试破解...');
+            bruteForceCode();
+        }
+    } catch (e) { showToast('获取失败'); }
+}
+
+// ==================== 二维码高级功能 ====================
+async function generateQRSignUrl() {
+    const activeId = document.getElementById('active-id').value;
+    const enc = document.getElementById('qr-enc').value;
+    if (!activeId) { showToast('请先选择签到任务'); return; }
+    
+    try {
+        const res = await fetch(`/api/qr-sign-url?activeId=${activeId}&enc=${enc}`);
+        const data = await res.json();
+        if (data.success) {
+            navigator.clipboard.writeText(data.url).then(() => {
+                showToast('代签链接已复制到剪贴板');
+            });
+            alert('代签链接（已复制）:\n' + data.url + '\n\n发送给同学，让同学打开此链接即可完成代签');
+        }
+    } catch (e) { showToast('生成失败'); }
+}
+
+// 生成手机扫码链接
+function generateMobileLink() {
+    const activeId = document.getElementById('active-id').value;
+    const courseId = document.getElementById('course-id').value;
+    const classId = document.getElementById('class-id').value;
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    
+    if (!activeId) { showToast('请先选择签到任务'); return; }
+    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+        alert('⚠️ 请先使用公网链接打开本页面，再点击分享！');
+        return;
+    }
+    
+    // 构建包含所有数据的URL
+    const params = new URLSearchParams({
+        mode: 'mobile',
+        activeId: activeId,
+        courseId: courseId || '',
+        classId: classId || '',
+        type: '2', // 二维码签到
+        u: username || '',
+        p: password || ''
+    });
+    
+    const url = `${window.location.origin}/?${params.toString()}`;
+    
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(() => showToast('📱 链接已复制，发给手机打开即可扫码签到'));
+    } else {
+        prompt('请复制此链接发送给手机:', url);
+    }
+}
+
+function showMultiSign() {
+    document.getElementById('multi-sign-modal').classList.add('active');
+}
+
+function closeMultiSign() {
+    document.getElementById('multi-sign-modal').classList.remove('active');
+}
+
+async function doMultiSign() {
+    const usersText = document.getElementById('multi-users').value.trim();
+    if (!usersText) { showToast('请输入账号列表'); return; }
+    
+    const users = usersText.split('\n').map(line => {
+        const [u, p] = line.split(',');
+        return { username: u.trim(), password: p?.trim() || '' };
+    }).filter(u => u.username && u.password);
+    
+    if (users.length === 0) { showToast('账号格式错误'); return; }
+    
+    const activeId = document.getElementById('active-id').value;
+    const btn = event.target;
+    btn.disabled = true; btn.textContent = '批量签到中...';
+    
+    try {
+        const res = await fetch('/api/multi-sign', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ activeId, signType: currentType, users })
+        });
+        const data = await res.json();
+        
+        let html = '';
+        data.data.forEach(r => {
+            html += `<div style="padding:8px;border-bottom:1px solid #eee;">
+                <b>${r.username}</b>: ${r.success ? '✅' : '❌'} ${r.message}
+            </div>`;
+        });
+        document.getElementById('multi-result').innerHTML = html;
+    } catch (e) { showToast('批量签到失败'); }
+    finally { btn.disabled = false; btn.textContent = '开始批量签到'; }
+}
+
+// ==================== 新增：扫码签到功能 ====================
+let scanSignScanner = null;
+
+function startScanSign() {
+    const overlay = document.getElementById('scan-overlay');
+    const msg = document.getElementById('scan-msg');
+    const resBox = document.getElementById('scan-res');
+    
+    overlay.classList.add('active');
+    msg.textContent = '📷 正在启动相机，请允许权限...';
+    resBox.style.display = 'none';
+    
+    // 动态加载扫码库（如果还没加载）
+    if (!window.Html5Qrcode) {
+        msg.textContent = '⚠️ 扫码组件未加载，请刷新页面';
+        return;
+    }
+    
+    Html5Qrcode.getCameras().then(devices => {
+        if (!devices.length) { msg.textContent = '未检测到摄像头'; return; }
+        
+        const camId = devices.find(d => d.label.toLowerCase().includes('back'))?.id || devices[0].id;
+        scanSignScanner = new Html5Qrcode("reader-full");
+        
+        scanSignScanner.start(camId, { fps: 10, qrbox: { width: 250, height: 250 } }, async (decodedText) => {
+            msg.textContent = '✅ 识别成功，正在提交签到...';
+            await scanSignScanner.stop();
+            
+            // 提取enc
+            let enc = decodedText.trim();
+            if (enc.includes('enc=')) {
+                const m = enc.match(/enc=([^&\s]+)/);
+                if (m) enc = m[1];
+            }
+            
+            // 直接调用签到
+            const payload = {
+                activeId: document.getElementById('active-id').value,
+                courseId: document.getElementById('course-id').value,
+                classId: document.getElementById('class-id').value,
+                signType: 2,
+                enc: enc
+            };
+            
+            try {
+                const res = await fetch('/api/sign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                resBox.style.display = 'block';
+                resBox.className = 'scan-res ' + (data.success ? 'ok' : 'err');
+                resBox.textContent = data.message || (data.success ? '签到成功' : '签到失败');
+                
+                if (data.success) {
+                    setTimeout(() => {
+                        stopScanSign();
+                        if (confirm('签到成功！返回任务列表？')) navTo('activities');
+                    }, 1500);
+                }
+            } catch (e) {
+                resBox.style.display = 'block';
+                resBox.className = 'scan-res err';
+                resBox.textContent = '提交失败: ' + (e.message || '网络错误');
+            }
+        }).catch(err => {
+            msg.textContent = '相机启动失败，请确保使用 HTTPS 访问并允许权限';
+        });
+    }).catch(() => msg.textContent = '无法获取摄像头列表');
+}
+
+function stopScanSign() {
+    const overlay = document.getElementById('scan-overlay');
+    if (scanSignScanner) {
+        scanSignScanner.stop().then(() => {
+            scanSignScanner = null;
+            overlay.classList.remove('active');
+        }).catch(() => {
+            overlay.classList.remove('active');
+        });
+    } else {
+        overlay.classList.remove('active');
+    }
+}
+
+// ==================== 通用签到 ====================
+async function doSign() {
+    const btn = document.getElementById('btn-sign');
+    const resultBox = document.getElementById('result-box');
+    
+    const payload = {
+        activeId: document.getElementById('active-id').value,
+        courseId: document.getElementById('course-id').value,
+        classId: document.getElementById('class-id').value,
+        signType: currentType
+    };
+    
+    if (currentType === 0) payload.objectId = document.getElementById('object-id').value;
+    else if (currentType === 4) {
+        payload.longitude = parseFloat(document.getElementById('longitude').value) || -1;
+        payload.latitude = parseFloat(document.getElementById('latitude').value) || -1;
+        payload.address = document.getElementById('address').value || '未知位置';
+        if (payload.longitude < 0 || payload.latitude < 0) { showToast('请输入有效的经纬度'); return; }
+    } else if (currentType === 3 || currentType === 5) {
+        payload.signCode = document.getElementById('sign-code').value;
+        if (!payload.signCode) { showToast('请输入密码/签到码'); return; }
+    } else if (currentType === 2) {
+        let enc = document.getElementById('qr-enc').value;
+        if (enc.includes('enc=')) { const match = enc.match(/enc=([^&]+)/); if (match) enc = decodeURIComponent(match[1]); }
+        payload.enc = enc;
+        if (!payload.enc) { showToast('请输入有效的enc参数'); return; }
+    }
+    
+    btn.disabled = true; btn.textContent = '签到中...'; resultBox.style.display = 'none';
+    try {
+        const res = await fetch('/api/sign', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        const data = await res.json();
+        resultBox.style.display = 'block';
+        resultBox.className = 'result-box ' + (data.success ? '' : 'error');
+        resultBox.textContent = data.message || '未知结果';
+        if (data.success) setTimeout(() => { if (confirm('签到成功！返回任务列表？')) navTo('activities'); }, 500);
+    } catch (e) {
+        resultBox.style.display = 'block'; resultBox.className = 'result-box error'; resultBox.textContent = '请求失败';
+    } finally { btn.disabled = false; btn.textContent = '立即签到'; }
+}
+
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg; toast.style.display = 'block';
+    setTimeout(() => toast.style.display = 'none', 2500);
+}
+
+// 页面加载检查
+window.onload = async () => {
+    try {
+        const res = await fetch('/api/userinfo');
+        const data = await res.json();
+        if (data.success && data.data.uid) updateUserInfo(data.data);
+    } catch (e) {}
+    
+    const saved = await fetch('/api/saved-account');
+    const savedData = await saved.json();
+    if (savedData.success && savedData.username) {
+        document.getElementById('username').value = savedData.username;
+        document.getElementById('password').value = savedData.password;
+    }
+};
+
+let encScanner = null;
+
+function toggleEncScanner() {
+    const box = document.getElementById('qr-scanner-box');
+    const btn = document.getElementById('btn-scan-enc');
+    const input = document.getElementById('qr-enc');
+    
+    if (box.style.display === 'block') {
+        if (encScanner) encScanner.stop().then(() => {
+            box.style.display = 'none';
+            btn.textContent = '📷 扫码';
+        }).catch(() => {});
+        return;
+    }
+    
+    box.style.display = 'block';
+    btn.textContent = '⏹ 取消';
+    encScanner = new Html5Qrcode("qr-scanner-box");
+  // 1. 基础配置
+const cfg = {
+  fps: 15,
+  qrbox: { width: 250, height: 250 }, // 识别区缩小，提速防卡顿
+  aspectRatio: 1.0,
+  disableFlip: true
+};
+
+// 2. 启动扫码（使用 facingMode 触发标准权限弹窗）
+encScanner.start(
+  { facingMode: "environment" }, // 🔑 标准写法：可靠触发后置摄像头权限请求
+  cfg,
+  (decodedText) => {
+    let val = decodedText.trim();
+    if (val.includes('enc=')) {
+      const m = val.match(/enc=([^&\s]+)/);
+      if (m) val = m[1];
+    }
+    input.value = val;
+    if (typeof showToast === 'function') showToast('✅ enc已自动填入');
+    
+    encScanner.stop().then(() => {
+      box.style.display = 'none';
+      btn.textContent = '📷 扫码';
+    }).catch(() => {});
+  },
+  (errorMessage) => {
+    // 过滤正常的“未识别二维码”提示，避免控制台刷屏
+    if (!errorMessage.includes("QR Code is not found")) {
+      console.warn("扫码帧错误:", errorMessage);
+    }
+  }
+).then(() => {
+  // ✅ 成功启动后：动态注入连续对焦约束（绕过 v2.3.8 的初始化限制）
+  setTimeout(() => {
+    const videoEl = document.querySelector('#reader-full video');
+    if (videoEl && videoEl.srcObject) {
+      const track = videoEl.srcObject.getVideoTracks()[0];
+      if (track) {
+        track.applyConstraints({
+          advanced: [{ focusMode: "continuous", autoFocus: "continuous" }]
+        }).catch(e => console.log("对焦约束注入提示:", e));
+      }
+    }
+  }, 800); // 等待视频流完全就绪
+}).catch(err => {
+  console.error("相机启动失败:", err);
+  // 精准处理权限拒绝
+  if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+    alert('请允许摄像头权限以使用扫码功能\n\n设置路径：浏览器设置 > 网站权限 > 摄像头');
+  } else {
+    alert('相机启动失败: ' + (err.message || '请使用 HTTPS 或 localhost 访问'));
+  }
+  box.style.display = 'none';
+  btn.textContent = '📷 扫码';
+});
+
+
+}
+
+</script>
+</body>
+</html>
